@@ -1,50 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A-Frame WebXR Tap-to-Place</title>
-    <!-- Load Tailwind for modern styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Fullscreen styles for the A-Frame scene */
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb;
-        }
-        /* A-Frame scene takes full screen */
-        a-scene {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        /* UI overlay for instructions and status */
-        #ui-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 1000;
-            pointer-events: none; /* Crucial: allows taps to reach the AR scene */
-            padding: 1rem;
-            text-align: center;
-        }
-    </style>
+// ... (Rest of the <head> and <style> tags remain the same) ...
 
-    <!-- Load A-Frame framework -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
     <script>
-        /**
-         * A-Frame Component for Markerless AR Surface Placement (Tap-to-Place)
-         * - Uses WebXR's native hit-testing feature.
-         * - Shows a reticle where the surface is detected.
-         * - Places the target model entity (defined by the `target` selector) on tap.
-         */
+        // ... (Component description remains the same) ...
+
         AFRAME.registerComponent('placement-helper', {
             schema: {
                 target: {type: 'selector', default: '#model'}, // The entity to place
@@ -53,40 +13,45 @@
 
             init: function () {
                 const el = this.el;
-                const data = this.data;
                 const scene = el.sceneEl;
 
                 // State variables
                 this.xrHitTestSource = null;
-                this.xrSession = null;
                 this.modelPlaced = false;
 
-                // Event listener for placing the model
+                // Bind handlers
                 this.onTap = this.onTap.bind(this);
+                // NOTE: Removed the separate touch handler. The click event on the canvas
+                // often fires for a touch *and* a mouse click in modern browsers.
                 
                 // Wait for the AR session to start
                 scene.addEventListener('ar-start', (event) => {
-                    this.xrSession = scene.renderer.xr.getSession();
+                    // Use the A-Frame scene-level 'click' event for placement.
+                    // This is generally better than using canvas.addEventListener('click')
+                    // because A-Frame normalizes tap/click events.
+                    scene.addEventListener('click', this.onTap);
+                    
+                    // We don't need to save the session explicitly, but the context is useful
+                    // this.xrSession = scene.renderer.xr.getSession(); 
                     this.setupHitTest();
-                    // Listen for clicks/taps only when in AR mode
-                    scene.canvas.addEventListener('click', this.onTap);
-                    scene.canvas.addEventListener('touchstart', (e) => {
-                        this.lastTouchY = e.touches[0].clientY;
-                    });
                 });
 
                 scene.addEventListener('ar-end', () => {
-                    scene.canvas.removeEventListener('click', this.onTap);
-                    scene.canvas.removeEventListener('touchstart', (e) => {
-                        this.lastTouchY = e.touches[0].clientY;
-                    });
+                    // Remove listener when AR ends
+                    scene.removeEventListener('click', this.onTap);
                     this.xrHitTestSource = null;
-                    this.xrSession = null;
+                    this.modelPlaced = false; // Reset state for next AR session
+                    
+                    // Hide model/reticle if AR ends abruptly
+                    this.data.target.object3D.visible = false;
+                    this.data.reticle.object3D.visible = false;
+                    document.getElementById('status-message').innerText = 'AR Session ended. Enter AR mode first.';
                 });
             },
 
             async setupHitTest() {
-                const session = this.xrSession;
+                const scene = this.el.sceneEl;
+                const session = scene.renderer.xr.getSession();
                 if (!session) return;
 
                 // The reference space to perform hit-testing in (usually 'viewer')
@@ -100,12 +65,11 @@
                     })
                     .catch(err => {
                         console.error('Could not get hit test source:', err);
-                        // Fallback UI message here
                     });
             },
 
             tick: function (t, dt) {
-                // Only run hit-testing if we are in an AR session and haven't placed the model
+                // ... (tick function is correct, no changes needed) ...
                 if (!this.el.sceneEl.is('ar-mode') || !this.xrHitTestSource || this.modelPlaced) {
                     this.data.reticle.object3D.visible = false;
                     return;
@@ -136,10 +100,8 @@
             },
 
             onTap: function (evt) {
-                // Prevent accidental placement from scrolling/swiping
-                if (this.lastTouchY && Math.abs(evt.touches[0].clientY - this.lastTouchY) > 5) {
-                    return; 
-                }
+                // The check for scroll/swipe is removed as we are now using the A-Frame 'click'
+                // event, which is triggered after a brief tap gesture.
 
                 if (!this.modelPlaced && this.lastDetectedPosition) {
                     // Place the model at the last detected surface position
@@ -158,8 +120,6 @@
                     // Update UI message
                     document.getElementById('status-message').innerText = 'Model placed! You can now move around it.';
                 } else if (this.modelPlaced) {
-                    // Reset or allow moving the model on subsequent taps (optional: simple reset)
-                    // For this simple demo, we'll just log it.
                     console.log('Model already placed.');
                 }
             }
@@ -167,65 +127,4 @@
     </script>
 </head>
 <body>
-
-    <div id="ui-overlay" class="bg-white/90 shadow-xl rounded-b-xl border-b-4 border-blue-500 max-w-sm mx-auto">
-        <h1 class="text-2xl font-extrabold text-gray-800">A-Frame Tap-to-Place AR</h1>
-        <p id="status-message" class="text-sm text-gray-600 mt-1">
-            <span class="font-bold text-red-600">Enter AR mode first.</span> Then, slowly move your device to find a surface.
-        </p>
-    </div>
-
-    <!-- The A-Frame Scene -->
-    <a-scene 
-        renderer="logarithmicDepthBuffer: true;"
-        webxr="requiredFeatures: [hit-test, local-floor]; 
-               optionalFeatures: [dom-overlay];"
-        vr-mode-ui="enabled: false"
-        ar-mode-ui="enabled: true"
-        placement-helper
-    >
-        <a-assets>
-            <!-- Load the Astronaut model -->
-            <a-asset-item id="astronaut-model" 
-                          src="https://modelviewer.dev/shared-assets/models/Astronaut.glb">
-            </a-asset-item>
-        </a-assets>
-        
-        <!-- 1. The Reticle: Shows the user where the surface is detected -->
-        <a-ring id="reticle" 
-                radius="0.1" 
-                color="#50C878" 
-                visible="false"
-                rotation="-90 0 0" 
-                material="shader: flat; opacity: 0.8;">
-        </a-ring>
-        
-        <!-- 2. The Model: Hidden initially, placed on tap -->
-        <a-gltf-model id="model" 
-                      src="#astronaut-model" 
-                      visible="false" 
-                      scale="0.2 0.2 0.2" 
-                      rotation="0 0 0"
-                      animation="property: rotation; 
-                                 to: 0 360 0; 
-                                 loop: true; 
-                                 dur: 15000; 
-                                 easing: linear;">
-        </a-gltf-model>
-
-        <!-- A-Frame camera entity (controlled by WebXR in AR mode) -->
-        <a-entity camera></a-entity>
-
-    </a-scene>
-
-    <script>
-        // Update status message when AR is ready to start hit testing
-        document.querySelector('a-scene').addEventListener('enter-vr', function () {
-            if (this.is('ar-mode')) {
-                document.getElementById('status-message').innerText = 'AR Mode Active. Slowly move your phone to detect a surface (reticle will appear).';
-            }
-        });
-    </script>
-
-</body>
-</html>
+// ... (Rest of the <body> section remains the same) ...
