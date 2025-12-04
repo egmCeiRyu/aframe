@@ -1,171 +1,153 @@
 <!DOCTYPE html>
-<html lang="jp">
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>3D Model Viewer</title>
-    
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A-Frame WebXR AR Example</title>
+    <!-- Load A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <link rel="stylesheet" href="modelviewer_style.css">
-    
     <style>
-        /* Styles for touch/interaction optimization */
-        #controls, label, button, .glass, .dim { touch-action: manipulation; }
-        .hideDim { font: normal 12pt Arial; font-weight: 500; color: white; pointer-events: auto; border-radius: 115px; }
-        
-        /* Styles for full-screen overlay/iframe handling */
-        body.no-scroll { overflow: hidden; position: fixed; width: 100%; height: 100%; top: 0; left: 0; }
+        /* Ensures the A-Frame canvas takes up the whole viewport */
+        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .a-canvas { display: block; }
 
-        #iframeWrapper {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            display: none; /* Mantido oculto por padrão */
-            flex-direction: column; overflow-y: auto;
-            -webkit-overflow-scrolling: touch; z-index: 9999;
-            justify-content: center; align-items: center;
-        }
-
-        #iframeWrapper iframe {
-            width: 85vw; height: 71vh; max-width: 546px;
-            background-color: white; border: 1px solid #ccc;
-            border-radius: 8px; overflow-y: auto;
+        /* Custom Overlay Styling */
+        #overlay {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px 0;
+            z-index: 1000; /* Ensure it's above the A-Frame scene */
+            pointer-events: none; /* Allows clicks to pass through unless on the button */
         }
         
-        /* Oculta o overlay de specs por padrão (se não for feito via class externa) */
-        .spec-overlay { display: none; }
+        /* AR Button Styling */
+        #ar-button {
+            padding: 12px 24px;
+            background-color: #4CAF50; /* Green */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            transition: background-color 0.2s, transform 0.1s;
+            pointer-events: auto; /* Re-enable clicks for the button itself */
+        }
+
+        #ar-button:hover {
+            background-color: #45a049;
+        }
+        
+        #ar-button:active {
+            transform: scale(0.98);
+        }
     </style>
 </head>
-
 <body>
-  <a-scene>
-    <a-assets>
-      <a-asset-item id="my-model" src="models/model1.glb"></a-asset-item>
-    </a-assets>
 
-    <a-gltf-model
-      src="#my-model"
-      rotation="0 0 0"  position="0 0 -2"> <a-animation
-        attribute="rotation"
-        dur="10000"
-        fill="forwards"
-        to="0 360 0"
-        repeat="indefinite">
-      </a-animation>
-    </a-gltf-model>
+    <!-- DOM OVERLAY for the custom button -->
+    <!-- We removed the 'hidden' class so the button shows immediately -->
+    <div id="overlay">
+        <button id="ar-button">Enter AR Mode</button>
+    </div>
 
-    <a-entity light="type: ambient; color: #BBB; intensity: 0.5;"></a-entity>
-    <a-entity light="type: directional; color: #FFF; intensity: 1.5;" position="-1 1 1"></a-entity>
-    
-    <a-entity camera look-controls wasd-controls position="0 2 3"></a-entity>
-    
-    <a-box 
-        position="0 -0.5 0" 
-        scale="10 0.1 10" 
-        color="#888" 
-        shadow>
-    </a-box>
+    <!--
+        A-Frame Scene Setup for AR:
+        - webxr="ui: false" hides the default A-Frame 'Enter VR/AR' buttons.
+        - 'overlayElement: #overlay' links our custom UI element.
+        - 'hit-test' is included for model placement in AR.
+    -->
+    <a-scene
+        id="my-scene"
+        webxr="requiredFeatures: [local-floor, hit-test]; optionalFeatures: [dom-overlay]; overlayElement: #overlay; referenceSpaceType: local-floor; ui: false;"
+        background="color: #ECEFF1">
 
-  </a-scene>
+        <!-- ASSETS: Defining the 3D Model -->
+        <a-assets>
+            <!-- Using a standard A-Frame test model -->
+            <a-asset-item id="desk-model" src="https://cdn.aframe.io/models/gltf/virtualcity/desk.gltf"></a-asset-item>
+        </a-assets>
 
-<script type="module">
+        <!-- CAMERA: Needed for scene interaction and viewing -->
+        <a-entity camera look-controls position="0 1.6 0"></a-entity>
 
+        <!-- 3D MODEL: The object to be viewed in 3D and AR -->
+        <a-gltf-model
+            id="model-container"
+            src="#desk-model"
+            position="0 0.5 -1.5"
+            scale="0.5 0.5 0.5"
+            rotation="0 0 0">
+            <!-- Auto-Rotation Animation (for standard 3D viewing mode) -->
+            <a-animation
+                attribute="rotation"
+                dur="12000"
+                fill="forwards"
+                to="0 360 0"
+                easing="linear"
+                repeat="indefinite">
+            </a-animation>
+        </a-gltf-model>
 
+        <!-- Lighting for the scene -->
+        <a-entity light="type: ambient; color: #FFF; intensity: 0.8;"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.5;" position="-1 2 4"></a-entity>
 
-        // -------------------------------------------------------------------------
-        // 5. LÓGICA DE SOBREPOSIÇÃO DE ESPECIFICAÇÕES (MANTIDA)
-        // -------------------------------------------------------------------------
-        
-        closeSpec.addEventListener('click', () => {
-            specOverlay.style.display = 'none';
-            iframeWrapper.style.display = 'none';
-            modelIframe.src = "";
-        });
+        <!-- Ground Plane (helpful for shadow in 3D mode) -->
+        <a-plane
+            position="0 0 -4"
+            rotation="-90 0 0"
+            width="10"
+            height="10"
+            color="#CCC"
+            shadow>
+        </a-plane>
 
-        closeIframeBtn.addEventListener('click', () => {
-            iframeWrapper.style.display = 'none';
-            modelIframe.src = '';
-        });
-        
-        // -------------------------------------------------------------------------
-        // 6. LÓGICA DE ATIVAÇÃO DO AR E EVENTOS (MANTIDA)
-        // -------------------------------------------------------------------------
+    </a-scene>
 
-        let arJustStarted = false;
-        let arTimeout = null;
-
-        function startAR() {
-            arOverlay.style.display = 'none';
-            arJustStarted = false;
-            modelViewer.activateAR();
-        }
-
-        arButton.addEventListener('click', (event) => {
-            if (!modelViewer.canActivateAR) {
-                console.log("デバイス/コンテキストで AR がサポートされていません。");
-                return;
-            }
-
-            if (!arJustStarted) {
-                event.preventDefault();
-                event.stopPropagation();
-
-                arOverlay.style.display = 'flex';
-                arJustStarted = true;
-                arTimeout = setTimeout(startAR, 2000);
-            }
-        });
-
-        arOverlay.addEventListener('click', () => {
-            if (arJustStarted) {
-                clearTimeout(arTimeout);
-                startAR();
-            }
-        });
-
-        modelViewer.addEventListener('ar-status', (event) => {
-            const status = event.detail.status;
-            if (status === 'presenting') {
-                modelViewer.play({ animationName: 'action' });
-                console.log("Forçando animação 'action' no modo AR.");
-            }
-            if (status === 'not-presenting' || status === 'failed') {
-                arOverlay.style.display = 'none';
-                arJustStarted = false;
-                clearTimeout(arTimeout);
-            }
-            
-            // Lógica de ajuste de câmera e AR Shadow DOM (mantida)
-            const shadowRoot = modelViewer.shadowRoot;
-            if (shadowRoot) {
-                const internalArButton = shadowRoot.querySelector('button[slot="ar-button"]');
-                if (internalArButton) {
-                    internalArButton.style.display = (status === 'presenting') ? 'none' : '';
-                }
-            }
-        });
-
-        modelViewer.addEventListener('load', () => {
-            const size = modelViewer.getDimensions();
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const suggestedDistance = maxDim * 1.5;
-            modelViewer.cameraOrbit = `0deg 75deg ${suggestedDistance}m`;
-        });
-                
-    </script>
-    
     <script>
-        // Funções para controle de scroll e iframe (não modulares)
-        function showModel10() {
-            const iframeWrapper = document.getElementById('iframeWrapper');
-            iframeWrapper.style.display = 'flex';
-            document.body.classList.add('no-scroll');
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const scene = document.getElementById('my-scene');
+            const arButton = document.getElementById('ar-button');
 
-        function hideIframe() {
-            const iframeWrapper = document.getElementById('iframeWrapper');
-            iframeWrapper.style.display = 'none';
-            document.body.classList.remove('no-scroll');
-        }
+            // --- 1. Handle button click to enter AR mode ---
+            arButton.addEventListener('click', () => {
+                // We directly call enterAR(). If the browser blocks it (e.g., if AR isn't supported), 
+                // A-Frame or the browser will handle the error gracefully.
+                scene.enterAR().catch(err => {
+                    // Log error to console, but the browser usually shows a message
+                    console.error("Failed to enter AR Mode:", err);
+                    arButton.textContent = 'AR Error';
+                    arButton.style.backgroundColor = '#d32f2f'; 
+                    setTimeout(() => {
+                        arButton.textContent = 'Enter AR Mode';
+                        arButton.style.backgroundColor = '#4CAF50';
+                    }, 3000);
+                });
+            });
+            
+            // --- 2. Change button text when AR is entered/exited ---
+            scene.addEventListener('enter-vr', () => {
+                // A-Frame emits 'enter-vr' for both VR and AR, so we check the mode
+                if (scene.is('ar-mode')) {
+                    arButton.textContent = 'Exit AR Mode';
+                    arButton.style.backgroundColor = '#d32f2f'; // Red for exit
+                }
+            });
+
+            scene.addEventListener('exit-vr', () => {
+                arButton.textContent = 'Enter AR Mode';
+                arButton.style.backgroundColor = '#4CAF50'; // Green for entry
+            });
+        });
     </script>
+
 </body>
 </html>
