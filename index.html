@@ -1,130 +1,114 @@
-// ... (Rest of the <head> and <style> tags remain the same) ...
+<!doctype html>
+<html lang="jp">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1 , user-scalable=no" />
+  <link rel="stylesheet" href="https://use.typekit.net/zfi8dmc.css">
+  <title>Firebase Auth</title>
 
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        background-color: #f4f7f6;
+    }
 
-    <script>
-        // ... (Component description remains the same) ...
+    .auth-container {
+        background-color: #fff;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+    }
 
-        AFRAME.registerComponent('placement-helper', {
-            schema: {
-                target: {type: 'selector', default: '#model'}, // The entity to place
-                reticle: {type: 'selector', default: '#reticle'} // The reticle entity
-            },
+    h1 {
+        color: #333;
+        margin-bottom: 30px;
+        font-size: 1.8em;
+        font-weight: 600;
+    }
 
-            init: function () {
-                const el = this.el;
-                const scene = el.sceneEl;
+    input[type="email"], 
+    input[type="password"] {
+        width: calc(100% - 20px);
+        padding: 12px 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 1em;
+    }
 
-                // State variables
-                this.xrHitTestSource = null;
-                this.modelPlaced = false;
+    input:focus {
+        border-color: #007bff;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+    }
 
-                // Bind handlers
-                this.onTap = this.onTap.bind(this);
-                // NOTE: Removed the separate touch handler. The click event on the canvas
-                // often fires for a touch *and* a mouse click in modern browsers.
-                
-                // Wait for the AR session to start
-                scene.addEventListener('ar-start', (event) => {
-                    // Use the A-Frame scene-level 'click' event for placement.
-                    // This is generally better than using canvas.addEventListener('click')
-                    // because A-Frame normalizes tap/click events.
-                    scene.addEventListener('click', this.onTap);
-                    
-                    // We don't need to save the session explicitly, but the context is useful
-                    // this.xrSession = scene.renderer.xr.getSession(); 
-                    this.setupHitTest();
-                });
+    .button-group {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+    }
 
-                scene.addEventListener('ar-end', () => {
-                    // Remove listener when AR ends
-                    scene.removeEventListener('click', this.onTap);
-                    this.xrHitTestSource = null;
-                    this.modelPlaced = false; // Reset state for next AR session
-                    
-                    // Hide model/reticle if AR ends abruptly
-                    this.data.target.object3D.visible = false;
-                    this.data.reticle.object3D.visible = false;
-                    document.getElementById('status-message').innerText = 'AR Session ended. Enter AR mode first.';
-                });
-            },
+    button {
+        flex: 1;
+        padding: 12px 0;
+        border: none;
+        border-radius: 6px;
+        background-color: #007bff;
+        color: white;
+        font-size: 1em;
+        cursor: pointer;
+        font-weight: 600;
+        transition: 0.2s;
+    }
 
-            async setupHitTest() {
-                const scene = this.el.sceneEl;
-                const session = scene.renderer.xr.getSession();
-                if (!session) return;
+    button:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+    }
 
-                // The reference space to perform hit-testing in (usually 'viewer')
-                const xrReferenceSpace = await session.requestReferenceSpace('viewer');
-                
-                // Request a persistent hit test source
-                session.requestHitTestSource({ space: xrReferenceSpace })
-                    .then(hitTestSource => {
-                        this.xrHitTestSource = hitTestSource;
-                        console.log('WebXR Hit Test Source acquired.');
-                    })
-                    .catch(err => {
-                        console.error('Could not get hit test source:', err);
-                    });
-            },
-
-            tick: function (t, dt) {
-                // ... (tick function is correct, no changes needed) ...
-                if (!this.el.sceneEl.is('ar-mode') || !this.xrHitTestSource || this.modelPlaced) {
-                    this.data.reticle.object3D.visible = false;
-                    return;
-                }
-                
-                const frame = this.el.sceneEl.frame;
-                const referenceSpace = this.el.sceneEl.renderer.xr.getReferenceSpace();
-
-                if (frame && referenceSpace) {
-                    const hitTestResults = frame.getHitTestResults(this.xrHitTestSource);
-
-                    if (hitTestResults.length > 0) {
-                        const hit = hitTestResults[0];
-                        const pose = hit.getPose(referenceSpace);
-                        
-                        // Update reticle position and visibility
-                        this.data.reticle.object3D.position.copy(pose.transform.position);
-                        this.data.reticle.object3D.quaternion.copy(pose.transform.orientation);
-                        this.data.reticle.object3D.visible = true;
-                        
-                        // Store the latest position for placement on tap
-                        this.lastDetectedPosition = pose.transform.position;
-                    } else {
-                        // Hide reticle if no surface is found
-                        this.data.reticle.object3D.visible = false;
-                    }
-                }
-            },
-
-            onTap: function (evt) {
-                // The check for scroll/swipe is removed as we are now using the A-Frame 'click'
-                // event, which is triggered after a brief tap gesture.
-
-                if (!this.modelPlaced && this.lastDetectedPosition) {
-                    // Place the model at the last detected surface position
-                    const model = this.data.target;
-                    model.setAttribute('position', {
-                        x: this.lastDetectedPosition.x,
-                        y: this.lastDetectedPosition.y,
-                        z: this.lastDetectedPosition.z
-                    });
-                    
-                    // Make the model visible and the reticle disappear
-                    model.object3D.visible = true;
-                    this.data.reticle.object3D.visible = false;
-                    this.modelPlaced = true;
-                    
-                    // Update UI message
-                    document.getElementById('status-message').innerText = 'Model placed! You can now move around it.';
-                } else if (this.modelPlaced) {
-                    console.log('Model already placed.');
-                }
-            }
-        });
-    </script>
+    #auth-status {
+        margin-top: 25px;
+        padding: 12px;
+        background-color: #e9ecef;
+        border-radius: 6px;
+        font-size: 0.9em;
+        color: #495057;
+    }
+  </style>
 </head>
+
 <body>
-// ... (Rest of the <body> section remains the same) ...
+    <div class="auth-container">
+        <h1>ログイン / 新規登録</h1>
+        <form>
+            <input type="email" id="email" placeholder="メールアドレス">
+            <input type="password" id="password" placeholder="パスワード">
+            <div class="button-group">
+                <button type="button" onclick="handleLogin()">ログイン</button>
+                <button type="button" onclick="handleSignup()">新規登録</button>
+            </div>
+        </form>
+
+        <p style="margin-top: 10px;">
+            <a href="#" onclick="handlePasswordReset(event)" style="font-size: 0.9em; color: #007bff; text-decoration: none;">
+                パスワードを忘れた場合
+            </a>
+        </p>
+
+        <p id="auth-status"></p>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
